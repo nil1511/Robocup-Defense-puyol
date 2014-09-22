@@ -1,49 +1,49 @@
 =======
-はじめに
+Introduction
 =======
-agent2dはlibrcscを使用したシンプルなチームの実装例です．RoboCup Soccer
-Simulator(rcssserver)バージョン15で動作させることを想定しています．
+agent2d is an implementation example of a team using a simple librcsc. RoboCup Soccer
+I assume that you have to work with (rcssserver) version 15 Simulator.
 
 - RoboCup Soccer Simulator Homepage: http://sserver.sf.net/
 - RoboCup Official Homepage: http://www.robocup.org/
 
-- librcsc Homepage: http://rctools.sourceforge.jp/
+- Librcsc Homepage: http://rctools.sourceforge.jp/
 
 ============
-要求ライブラリ
+Request library
 ============
-agent2d-3.1.1 は以下のライブラリを要求します．
+agent2d-3.1.1 will require the following libraries.
 
- - boost-1.32 or later
- - librcsc-4.1.x
+ - Boost-1.32 or later
+ - Librcsc-4.1.x
 
 =====
-ビルド
+Build
 =====
-パッケージを展開したディレクトリ内部で以下のコマンドを実行します:
+I run the following command in the directory inside where you extracted the package:
 
 ./configure
 make
 
-librcscをシステムのディレクトリにインストールしていない場合，以下のよ
-うにconfigureの'--with-librcsc'オプションによってlibrcscのインストール
-パスを指定しなければなりません．
+If you do not have installed in a directory system librcsc, the following
+The installation of librcsc by '--with-librcsc' option of sea urchin configure
+You must specify the path.
 
-./configure --with-librcsc=/path/to/prefix
+./configure --with-librcsc = / path / to / prefix
 
-この場合，環境変数 LD_LIBRARY_PATH も設定する必要があるかもしれません．
+In this case, you might also need to set the environment variable LD_LIBRARY_PATH.
 
 =================
-インストール時の設定
+Settings during installation
 =================
-agent2dをビルドする前に，パッケージに含まれるconfigureスクリプトのオプ
-ションによって設定を変更することができます．configureで指定できるオプ
-ションの詳細は，'configure --help'を実行することで参照できます．
+Before you build the agent2d, and options of the configure script that is included in the package
+You can change the settings by tion. options that can be specified in the configure
+Tion details can be referenced by running the 'configure --help'.
 
 ==========
-チームの起動
+Starting team
 ==========
-agent2dのチームを起動するには，srcディレクトリ内で以下のコマンドをタイ
-プします．
+To start a team of agent2d, Thailand the following command in the src directory
+You up.
 
-`./start.sh'
+`./start.sh '
