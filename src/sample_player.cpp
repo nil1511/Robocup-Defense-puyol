@@ -69,6 +69,7 @@
 #include <rcsc/action/view_synch.h>
 #include <rcsc/action/body_hold_ball.h>
 #include <rcsc/action/body_dribble.h>
+#include <rcsc/action/body_clear_ball2009.h>
 
 #include <rcsc/formation/formation.h>
 #include <rcsc/action/kick_table.h>
@@ -722,7 +723,8 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
             return true;
             }
 
-            Bhv_BasicOffensiveKick().execute( agent );
+            //Bhv_BasicOffensiveKick().execute( agent );
+            PuyolClear(agent);
             return true;
 
             }
@@ -730,7 +732,8 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
         // I don't have the ball, opponent has it, off the ball movement while defending.
         //falling back etc.     
         else if (!kickable && Opponenthasball){
-            Bhv_BasicMove().execute(agent);
+            //Bhv_BasicMove().execute(agent);
+            PuyolMove(agent);
         }
         return true;
     };
@@ -740,6 +743,29 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
     return true;
 }
 
+bool
+SamplePlayer::PuyolMove(PlayerAgent *agent){
+    const WorldModel &wm = agent->world();
+    const Vector2D target_point = Strategy::i().getPosition(wm.self().unum());
+    const double dash_power = Strategy::get_normal_dash_power(wm);
+    double dist_thr = wm.ball().distFromSelf()*0.1;
+    if(dist_thr<1.0)
+        dist_thr=1.0;
+    if ( ! Body_GoToPoint2010( target_point, dist_thr, dash_power
+                           ).execute( agent ) )
+    {
+        Body_TurnToBall().execute( agent );
+    }
+    return true;
+}
+
+bool
+SamplePlayer::PuyolClear(PlayerAgent *agent){
+    if(Body_ClearBall2009().execute(agent))
+        return true;
+    else
+        return false;
+}
 /*-------------------------------------------------------------------*/
 /*!
 

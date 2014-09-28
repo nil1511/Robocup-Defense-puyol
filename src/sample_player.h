@@ -130,6 +130,12 @@ public:
     bool 
     executeSampleRole( rcsc::PlayerAgent * agent );
 
+    bool 
+    PuyolMove(rcsc::PlayerAgent *agent);
+
+    bool
+    PuyolClear(rcsc::PlayerAgent *agent);
+
     bool
     PlacePlayers(rcsc::PlayerAgent * agent);
 
