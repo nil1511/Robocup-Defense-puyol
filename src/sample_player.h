@@ -136,6 +136,9 @@ public:
     bool
     PuyolClear(rcsc::PlayerAgent *agent);
 
+    bool 
+    doIntercept(rcsc::PlayerAgent *agent);
+
     bool
     PlacePlayers(rcsc::PlayerAgent * agent);
 

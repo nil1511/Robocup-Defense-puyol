@@ -83,6 +83,7 @@
 #include <rcsc/action/body_hold_ball.h>
 #include <rcsc/action/body_pass.h>
 #include <rcsc/action/neck_scan_field.h>
+ #include <rcsc/action/neck_scan_players.h>
 #include <rcsc/action/neck_turn_to_low_conf_teammate.h>
 #include <rcsc/common/basic_client.h>
 #include <rcsc/common/logger.h>
@@ -756,6 +757,35 @@ SamplePlayer::PuyolMove(PlayerAgent *agent){
     {
         Body_TurnToBall().execute( agent );
     }
+        
+    if(wm.existKickableOpponent() &&
+        wm.ball().distFromSelf()<10){
+        //if player is close to opponent who has the ball and no ther teamamte is in way then intercept
+        //std::cout << wm.existKickableOpponent() << " " << wm.ball().distFromSelf() << " " <<
+        //wm.existKickableTeammate() << "\n ";
+        //agent->setNeckAction(new Neck_TurnToBall());
+        //Body_Intercept().execute( agent );
+        if(doIntercept(agent)){
+            std::cout << "gh" << "\n";
+            const ServerParam & SP = ServerParam::i();
+            double tackle_power = SP.maxTacklePower();
+            //agent->doTackle(tackle_power);
+            //agent->setNeckAction(new Neck_TurnToBall());
+            double tackle_dir = ( 0.0 - wm.self().body() ).degree();
+            agent->doTackle( tackle_dir );
+            agent->setNeckAction( new Neck_TurnToBallOrScan() );
+            //agent->setNeckAction( new Neck_TurnToBallOrScan() );
+        }
+        else{
+            agent->setNeckAction( new Neck_TurnToBallOrScan() );
+            //agent->setNeckAction(new Neck_TurnToBall());
+            std::cout << "her" << "\n"; 
+        }
+    }
+    else{
+        //fall back by scanning players.TODO-implement safety region
+        agent->setNeckAction(new Neck_ScanPlayers());
+    }
     return true;
 }
 
@@ -766,6 +796,42 @@ SamplePlayer::PuyolClear(PlayerAgent *agent){
     else
         return false;
 }
+
+bool 
+SamplePlayer::doIntercept(PlayerAgent *agent){
+    const WorldModel& wm = agent->world();
+    std::cout << "fd " << wm.ball().distFromSelf() << "\n";
+    if(wm.ball().distFromSelf()<5.0 && wm.existKickableOpponent()){
+        const PlayerObject* opp = wm.opponentsFromBall().front();
+        std::cout << "nm" << "\n";
+        if(opp){
+            std::cout << "r" << "\n";
+            //Vector2D mynext_pos = wm.self().pos() + wm.self().vel();
+            Vector2D opp_pos = opp->pos() + opp->vel();
+            const double dash_power = Strategy::get_normal_dash_power(wm);
+            double dist_thr = wm.ball().distFromSelf()*0.1;
+            std::cout << "d " << mynext_pos << " " << wm.self().unum() << "\n" ;
+            //Body_GoToPoint2010(opp_pos,dist_thr,dash_power).execute(agent);
+            /*Body_GoToPoint( opp_pos,
+                                0.1,
+                                ServerParam::i().maxDashPower(),
+                                -1.0, // dash speed
+                                1, // cycle
+                                true, // save recovery
+                                15.0  // dir thr
+                                ).execute( agent );*/
+            if ( ! Body_GoToPoint( opp_pos,dist_thr,dash_power
+                           ).execute( agent ) )
+            {
+                Body_TurnToBall().execute( agent );
+            }
+
+            return true; 
+        }
+    }
+    return false;
+}
+
 /*-------------------------------------------------------------------*/
 /*!
 
