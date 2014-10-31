@@ -137,6 +137,9 @@ public:
     PuyolClear(rcsc::PlayerAgent *agent);
 
     bool 
+    moveForwards(rcsc::PlayerAgent *agent);
+
+    bool 
     doIntercept(rcsc::PlayerAgent *agent);
 
     bool
@@ -211,7 +214,15 @@ public:
     bool
     SampleDribble(rcsc::PlayerAgent * agent);
 
+    bool 
+    permanentManmark(rcsc::PlayerAgent * agent,int n);
 
+    bool 
+    closestManmark(rcsc::PlayerAgent * agent);
+
+    bool 
+    formWall(rcsc::PlayerAgent * agent);
+    
     bool
     ManMark( rcsc::PlayerAgent * agent );
 
