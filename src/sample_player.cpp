@@ -112,7 +112,9 @@ SamplePlayer::SamplePlayer()
     : PlayerAgent(),
       M_communication(),
       M_field_evaluator( createFieldEvaluator() ),
-      M_action_generator( createActionGenerator() )
+      M_action_generator( createActionGenerator() ),
+      wall_pos(arr_pos,arr_pos+sizeof(arr_pos)/sizeof(arr_pos[0])),
+      wall_pos2(arr_pos2,arr_pos2+sizeof(arr_pos2)/sizeof(arr_pos2[0]))
 {
     boost::shared_ptr< AudioMemory > audio_memory( new AudioMemory );
 
@@ -695,6 +697,11 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
 
     //ATTACK STARTS HERE
     // I have the ball, what to do?
+    if(!Opponenthasball){
+        //occupied.erase(occupied.begin(),occupied.end());
+    }
+
+
     if ( kickable && !Opponenthasball)
     {
         doKick( this);
@@ -719,17 +726,27 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
         //divide pitch into three parts for forward,midfield and defenders
         int cur_agent = agent->world().self().unum();
         //forward-10,11;def-2,3,4,5;mid-6,7,8,9
-        if(cur_agent==7){
+        if(agent->world().ball().distFromSelf()<2 && agent->world().ball().pos().x < 0){
+            std::cout << "as \n";
+            if(Body_ClearBall2009().execute(agent)){
+                std::cout << "qw \n";
+                return true;
+            }
+        }
+        if(cur_agent==8){
             //manmark forward-number:10 during whole match
             permanentManmark(agent,10);
         }
-        else if(cur_agent==8){
+        else if(Opponenthasball && cur_agent==9){
             //manmark forward number:11 during whole match
             permanentManmark(agent,11);
         }
-        else if(Opponenthasball && agent->world().ball().pos().x < 10 && cur_agent<=5){
+        else if(Opponenthasball && agent->world().ball().pos().x < 30 && cur_agent<=5){
             //remaining 2 defenders form wall  if ball is in our half
             formWall(agent);
+        }
+        else if(Opponenthasball && agent->world().ball().pos().x < 0 && cur_agent==6 || cur_agent==7){
+            formWall2(agent);
         }
         else{
             int close = ClosestPlayerToBall(agent);
@@ -740,7 +757,7 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
                     agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
                 }
                 else{
-                    Bhv_BasicMove().execute(agent);
+                    closestManmark(agent);
                 }
             }
             else{
@@ -754,10 +771,84 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
     return true;
 }
 
+Vector2D
+SamplePlayer::findClosestPos(PlayerAgent *agent){
+    /*int unum=agent->world().self().unum();
+    std::cout << unum << " w " << occupied.size() << "\n";
+    if(occupied.find(unum)!=occupied.end()){
+        std::cout << unum << " " << occupied[unum] << " \n";
+        return wall_pos[occupied[unum]];
+    }
+    int pos=-1;
+    double mindis=1000000.0;
+
+    for(int i=0;i<4;i++){
+        //find if already occupied ith pos
+        std::map<int,int>::iterator it;
+        bool filled=false;
+        std::cout << occupied.size() << " e" << " \n";
+        for(it=occupied.begin();it!=occupied.end();it++){
+            std::cout << it->second << " " << unum << " we " << i << "\n";
+            if(it->second==i){
+                filled=true;
+                break;
+            }
+        }
+        if(filled)
+            continue;
+        double dis=agent->world().ourPlayer(unum)->pos().dist(wall_pos[i]);
+        if(dis<mindis){
+            pos=i;
+            mindis=dis;
+        }
+    }
+
+    occupied[unum]=pos;
+
+    std:: cout << unum << " " << pos << " df\n";
+    return wall_pos[occupied[unum]];*/
+    int unum=agent->world().self().unum();
+    int pos=-1;
+    double mindis=1000000.0;
+    for(int i=0;i<4;i++){
+        double dis=agent->world().ourPlayer(unum)->pos().dist(wall_pos[i]);
+        if(dis<mindis){
+            pos=i;
+            mindis=dis;
+        }
+    }
+    return wall_pos[pos];
+}
+
+bool
+SamplePlayer::IsOccupied(PlayerAgent * agent, Vector2D target, double buffer){
+    //Body_TurnToPoint( target ).execute( agent );
+    if(abs(target.x)>55 || abs(target.y)>35)
+        return true;
+
+    Neck_TurnToPoint( target ).execute(agent );
+    const WorldModel & wm = agent->world();
+
+    if ( target.x > wm.offsideLineX() + 1.0 ){
+        // offside players are rejected.
+        return true;
+    }
+    for(int i=2; i<=11; i++){
+        if(wm.ourPlayer(i)!=NULL){
+            Vector2D player_pos = wm.ourPlayer(i)->pos();
+            if( AreSamePoints(player_pos, target, buffer) && i!=wm.self().unum() )
+                return true;
+        }
+    }
+    return false;
+}
+
 bool
 SamplePlayer::formWall(PlayerAgent *agent){
     Vector2D pos;
-    if(agent->world().self().unum()==2){
+    //agent->world().ourPlayer(i)->pos().dist()
+    pos=findClosestPos(agent);
+    /*if(agent->world().self().unum()==2){
         pos = Vector2D(-47,-11);
     }
     else if(agent->world().self().unum()==3){
@@ -768,6 +859,83 @@ SamplePlayer::formWall(PlayerAgent *agent){
     }
     else{
         pos = Vector2D(-47,11);
+    }*/
+    Vector2D ball_pos=agent->world().ball().pos();
+    if(IsOccupied(agent,pos,2)){
+        Vector2D disp;
+        if(ball_pos.y>pos.y){
+            disp.y=8;
+            disp.x=-2;
+        }
+        else{
+            disp.y=-8;
+            disp.x=-2;
+        }
+        pos.x=pos.x+disp.x;
+        pos.y=pos.y+disp.y;
+    }
+    Body_GoToPoint(pos, 0.5, ServerParam::i().maxDashPower()).execute( agent );
+    Bhv_BasicTackle( 0.8, 80.0 ).execute( agent );
+
+    const WorldModel & wm = agent->world();
+    const int self_min = wm.interceptTable()->selfReachCycle();
+    const int mate_min = wm.interceptTable()->teammateReachCycle();
+    const int opp_min = wm.interceptTable()->opponentReachCycle();
+
+    //Intercept
+    if ( ! wm.existKickableTeammate()
+         && ( self_min <= 3
+              || ( self_min <= mate_min
+                   && self_min < opp_min + 3 )
+              )
+         )
+    {
+        std::cout<<"body intercept called for player - "<<wm.self().unum()<<std::endl;
+
+
+        dlog.addText( Logger::TEAM,
+                      __FILE__": intercept");
+        Body_Intercept().execute( agent );
+        agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
+        return true;
+    }
+
+    if ( wm.existKickableOpponent()
+         && wm.ball().distFromSelf() < 18.0 )
+    {
+        agent->setNeckAction( new Neck_TurnToBall() );
+        return true;
+    }
+    else
+    {
+        agent->setNeckAction( new Neck_TurnToBallOrScan() );
+    }
+
+    return true;
+}
+
+bool
+SamplePlayer::formWall2(PlayerAgent *agent){
+    Vector2D ball_pos=agent->world().ball().pos();
+    Vector2D pos;
+    if(ball_pos.y<0){
+        pos=wall_pos2[0];
+    }
+    else{
+        pos=wall_pos2[1];
+    }
+    if(IsOccupied(agent,pos,2)){
+        Vector2D disp;
+        if(ball_pos.y<0){
+            disp.y=-6;
+            disp.x=-2;
+        }
+        else{
+            disp.y=6;
+            disp.x=-2;
+        }
+        pos.x=pos.x+disp.x;
+        pos.y=pos.y+disp.y;
     }
     Body_GoToPoint(pos, 0.5, ServerParam::i().maxDashPower()).execute( agent );
     Bhv_BasicTackle( 0.8, 80.0 ).execute( agent );
@@ -811,8 +979,6 @@ SamplePlayer::formWall(PlayerAgent *agent){
 
 bool
 SamplePlayer::permanentManmark(PlayerAgent *agent,int opp_unum){
-//agent->world().getTeammateNearestToBall();
-//agent->world().getPlayerCont()
     const WorldModel &wm = agent->world();
     const PlayerPtrCont &opps = wm.opponentsFromSelf();
     PlayerPtrCont::const_iterator it;
@@ -964,9 +1130,6 @@ SamplePlayer::ManMark( PlayerAgent * agent ){
             if((ppos.dist(nearest_opp_pos) < mindis) && (ppos.x<wm.self().pos().x) ){
                 goodtogo = false;
                 break;
-               // mindis = agent->world().ourPlayer(i)->distFromBall();
-
-               // mindisunum = i;
             }
             else{
                 ;
@@ -978,72 +1141,19 @@ SamplePlayer::ManMark( PlayerAgent * agent ){
 
     if (!goodtogo){
         Vector2D spos = wm.self().pos();
-        //spos.x = spos.x - 2;
-
-       // Body_GoToPoint(spos, 0.5, ServerParam::i().maxDashPower()).execute( agent );
 
         if(!Bhv_BasicTackle( 0.8, 80.0 ).execute( agent )){
-
-
-
-
-
-
-
-    /*--------------------------------------------------------*/
-    // chase ball
+        // chase ball
         if (wm.ball().pos().dist(wm.self().pos())<3){
-        Body_Intercept().execute( agent );
-        agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
-    }
-    Body_GoToPoint(spos, 0.5, ServerParam::i().maxDashPower()).execute( agent );
+            Body_Intercept().execute( agent );
+            agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
+        }
+        Body_GoToPoint(spos, 0.5, ServerParam::i().maxDashPower()).execute( agent );
 
-}
+        }
 
     bool upper_dee_taken = false;
     bool lower_dee_taken = false;
-//Logic for the players who are free in 1/4 of the ground, will run to the goal and try to stand in front of the goal
-/*if (wm.self().pos().x<-10){
-    for(int i=2; i<=11; i++){
-        if((agent->world().ourPlayer(i)!=NULL)&&(i!=wm.self().unum())) {
-
-            if(AreSamePoints( agent->world().ourPlayer(i)->pos(), upper_dee_spot, 2 )) {
-
-                upper_dee_taken = true;
-               // mindis = agent->world().ourPlayer(i)->distFromBall();
-
-               // mindisunum = i;
-            }
-        }
-
-
-    }
-    if (!upper_dee_taken){
-        Body_GoToPoint(upper_dee_spot, 0.5, ServerParam::i().maxDashPower()).execute( agent );
-    }
-    else{
-        for(int i=2; i<=11; i++){
-        if((agent->world().ourPlayer(i)!=NULL)&&(i!=wm.self().unum())) {
-
-            if(AreSamePoints( agent->world().ourPlayer(i)->pos(), lower_dee_spot, 2 )) {
-
-                lower_dee_taken = true;
-               // mindis = agent->world().ourPlayer(i)->distFromBall();
-
-               // mindisunum = i;
-            }
-        }
-
-
-    }
-    if (!lower_dee_taken){
-        Body_GoToPoint(lower_dee_spot, 0.5, ServerParam::i().maxDashPower()).execute( agent );
-    }
-    else{
-        //still free
-    }
-    }
-    */
     int mydisfromupper = wm.self().pos().dist(upper_dee_spot);
     int mydisfromlower = wm.self().pos().dist(lower_dee_spot);
     if ((wm.self().pos().x<-10)&&(wm.ball().pos().x<-10)){
@@ -1053,8 +1163,8 @@ SamplePlayer::ManMark( PlayerAgent * agent ){
                 if (wm.ball().pos().dist(wm.self().pos())<5){
                     Body_Intercept().execute( agent );
                     agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
-                    }
                 }
+            }
         }
         else{
             Body_GoToPoint(upper_dee_spot, 0.5, ServerParam::i().maxDashPower()).execute( agent );
@@ -1062,217 +1172,11 @@ SamplePlayer::ManMark( PlayerAgent * agent ){
                 if (wm.ball().pos().dist(wm.self().pos())<5){
                     Body_Intercept().execute( agent );
                     agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
-                    }
                 }
-        }
-
-
-
-
-
-
-        /*
-    for(int i=2; i<=11; i++){
-        if((agent->world().ourPlayer(i)!=NULL)&&(i!=wm.self().unum())) {
-
-            if(agent->world().ourPlayer(i)->pos().dist(upper_dee_spot) < mydisfromupper){
-                upper_dee_taken = true;
-                break;
-               // mindis = agent->world().ourPlayer(i)->distFromBall();
-
-               // mindisunum = i;
-            }
-            else{
-                ;
             }
         }
-        upper_dee_taken = false;
     }
-
-    if (!upper_dee_taken){
-        //goingtopen = true;
-        Body_GoToPoint(upper_dee_spot, 0.5, ServerParam::i().maxDashPower()).execute( agent );
-        if(!Bhv_BasicTackle( 0.8, 80.0 ).execute( agent )){
-        if (wm.ball().pos().dist(wm.self().pos())<5){
-            Body_Intercept().execute( agent );
-            agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
-        }
 }
-
-
-    }
-    else{
-      for(int i=2; i<=11; i++){
-        if((agent->world().ourPlayer(i)!=NULL)&&(i!=wm.self().unum())) {
-
-            if((agent->world().ourPlayer(i)->pos().dist(lower_dee_spot) < mydisfromlower)&&(!AreSamePoints(agent->world().ourPlayer(i)->pos(),upper_dee_spot,1))){
-                lower_dee_taken = true;
-                break;
-               // mindis = agent->world().ourPlayer(i)->distFromBall();
-
-               // mindisunum = i;
-            }
-            else{
-                ;
-            }
-        }
-        lower_dee_taken = false;
-    }
-
-    if (!lower_dee_taken){
-        //goingtopen = true;
-        Body_GoToPoint(lower_dee_spot, 0.5, ServerParam::i().maxDashPower()).execute( agent );
-        if(!Bhv_BasicTackle( 0.8, 80.0 ).execute( agent )){
-
-
-
-
-
-    */
-
-    /*--------------------------------------------------------
-    //chase ball
-        if (wm.ball().pos().dist( wm.self().pos() ) <5){
-        Body_Intercept().execute( agent );
-        agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
-    }
-*/
-}
-
-
-
-
-    else{
-        //still free
-    }
-
-
- }
-
-    return true;
-
-}
-
-/*
-bool
-SamplePlayer::moveForwards(PlayerAgent *agent){
-    int for1=agent->world().self().unum();
-    int for2=agent->world().self().unum()==10?11:10;
-    if(agent->world().ourPlayer(for1)->distFromBall()<agent->world().ourPlayer(for2)->distFromBall()){
-        std::cout << "rt \n";
-        if(Bhv_BasicTackle(0.8,80.0).execute(agent)){
-            return true;
-        }
-    }
-    else{
-    PlayerPtrCont::iterator it = agent->world().opponentsFromBall().;
-    for(it=agent->world().opponentsFromBall().begin();it!=agent->world().opponentsFromBall().end();it++){
-
-    }
-    Vector2D tar_pt=agent->world().opponentsFromBall().front()->pos();
-    std::cout << "gs " << tar_pt.x << " " << tar_pt.y << "\n";
-    if(!Body_GoToPoint(tar_pt,agent->world().ball().distFromSelf(),80.0).execute(agent)){
-        Body_TurnToBall().execute( agent );
-    }
-    }
-
-    return false;
-}
-*/
-bool moveForwards(PlayerAgent *agent){
-    return true;
-}
-
-bool
-SamplePlayer::PuyolMove(PlayerAgent *agent){
-    /*const WorldModel &wm = agent->world();
-    const Vector2D target_point = Strategy::i().getPosition(wm.self().unum());
-    const double dash_power = Strategy::get_normal_dash_power(wm);
-    double dist_thr = wm.ball().distFromSelf()*0.1;
-    if(dist_thr<1.0)
-        dist_thr=1.0;
-    if ( ! Body_GoToPoint2010( target_point, dist_thr, dash_power
-                           ).execute( agent ) )
-    {
-        Body_TurnToBall().execute( agent );
-    }
-
-    if(wm.existKickableOpponent() &&
-        wm.ball().distFromSelf()<10){
-        //if player is close to opponent who has the ball and no ther teamamte is in way then intercept
-        //std::cout << wm.existKickableOpponent() << " " << wm.ball().distFromSelf() << " " <<
-        //wm.existKickableTeammate() << "\n ";
-        //agent->setNeckAction(new Neck_TurnToBall());
-        //Body_Intercept().execute( agent );
-        if(doIntercept(agent)){
-            std::cout << "gh" << "\n";
-            const ServerParam & SP = ServerParam::i();
-            double tackle_power = SP.maxTacklePower();
-            //agent->doTackle(tackle_power);
-            //agent->setNeckAction(new Neck_TurnToBall());
-            double tackle_dir = ( 0.0 - wm.self().body() ).degree();
-            agent->doTackle( tackle_dir );
-            agent->setNeckAction( new Neck_TurnToBallOrScan() );
-            //agent->setNeckAction( new Neck_TurnToBallOrScan() );
-        }
-        else{
-            agent->setNeckAction( new Neck_TurnToBallOrScan() );
-            //agent->setNeckAction(new Neck_TurnToBall());
-            //std::cout << "her" << "\n";
-        }
-    }
-    else{
-        //fall back by scanning players.TODO-implement safety region
-        agent->setNeckAction(new Neck_ScanPlayers());
-    }*/
-    return true;
-}
-
-bool
-SamplePlayer::PuyolClear(PlayerAgent *agent){
-    std::cout << "Clear \n";
-    /*if(Body_ClearBall2009().execute(agent))
-        return true;
-    else
-        return false;
-    */
-    return true;
-}
-
-bool
-SamplePlayer::doIntercept(PlayerAgent *agent){
-    /*const WorldModel& wm = agent->world();
-    std::cout << "fd " << wm.ball().distFromSelf() << "\n";
-    if(wm.ball().distFromSelf()<5.0 && wm.existKickableOpponent()){
-        const PlayerObject* opp = wm.opponentsFromBall().front();
-        std::cout << "nm" << "\n";
-        if(opp){
-            std::cout << "r" << "\n";
-            //Vector2D mynext_pos = wm.self().pos() + wm.self().vel();
-            Vector2D opp_pos = opp->pos() + opp->vel();
-            const double dash_power = Strategy::get_normal_dash_power(wm);
-            double dist_thr = wm.ball().distFromSelf()*0.1;
-            //std::cout << "d " << mynext_pos << " " << wm.self().unum() << "\n" ;
-            //Body_GoToPoint2010(opp_pos,dist_thr,dash_power).execute(agent);
-            Body_GoToPoint( opp_pos,
-                                0.1,
-                                ServerParam::i().maxDashPower(),
-                                -1.0, // dash speed
-                                1, // cycle
-                                true, // save recovery
-                                15.0  // dir thr
-                                ).execute( agent );
-            /*if ( ! Body_GoToPoint( opp_pos,dist_thr,dash_power
-                           ).execute( agent ) )
-            {
-                Body_TurnToBall().execute( agent );
-            }
-
-            return true;
-        }
-    }
-        }
-    }*/
     return true;
 }
 

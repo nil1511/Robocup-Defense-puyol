@@ -35,7 +35,7 @@
 #include <rcsc/geom/vector_2d.h>
 #include <rcsc/player/soccer_action.h>
 #include <vector>
- #include "bhv_basic_offensive_kick.h"
+#include "bhv_basic_offensive_kick.h"
 #include "strategy.h"
 
 #include "bhv_basic_tackle.h"
@@ -57,6 +57,7 @@
 
 #include <string>
 #include <vector>
+#include <map> 
 
 class SamplePlayer
     : public rcsc::PlayerAgent {
@@ -126,6 +127,13 @@ public:
     bool
     FoundNewBH;
 
+    rcsc::Vector2D arr_pos[4] = {rcsc::Vector2D(-47,-11),rcsc::Vector2D(-47,-3),rcsc::Vector2D(-47,3),rcsc::Vector2D(-47,11)};
+
+    rcsc::Vector2D arr_pos2[2] = {rcsc::Vector2D{-40,-6},rcsc::Vector2D{-40,6}};
+
+    std::vector<rcsc::Vector2D> wall_pos2;
+
+    std::vector<rcsc::Vector2D> wall_pos;
 
     bool 
     executeSampleRole( rcsc::PlayerAgent * agent );
@@ -220,9 +228,15 @@ public:
     bool 
     closestManmark(rcsc::PlayerAgent * agent);
 
+    rcsc::Vector2D 
+    findClosestPos(rcsc::PlayerAgent * agent);
+
     bool 
     formWall(rcsc::PlayerAgent * agent);
     
+    bool 
+    formWall2(rcsc::PlayerAgent *agent);
+
     bool
     ManMark( rcsc::PlayerAgent * agent );
 
@@ -244,10 +258,11 @@ private:
     bool doShoot();
     bool doForceKick();
     bool doHeardPassReceive();
+    //static std::map<int,int> occupied;
 
 public:
     virtual
     FieldEvaluator::ConstPtr getFieldEvaluator() const;
 };
-
+static std::map<int,int> occupied;
 #endif
