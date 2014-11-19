@@ -697,9 +697,6 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
 
     //ATTACK STARTS HERE
     // I have the ball, what to do?
-    if(!Opponenthasball){
-        //occupied.erase(occupied.begin(),occupied.end());
-    }
 
 
     if ( kickable && !Opponenthasball)
@@ -726,26 +723,23 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
         //divide pitch into three parts for forward,midfield and defenders
         int cur_agent = agent->world().self().unum();
         //forward-10,11;def-2,3,4,5;mid-6,7,8,9
-        if(agent->world().ball().distFromSelf()<2 && agent->world().ball().pos().x < 0){
-            std::cout << "as \n";
+        std::cout << cur_agent << " zx " << agent->world().self().isKickable() << "\n";
+        if(Opponenthasball && agent->world().self().isKickable() && agent->world().ball().pos().x < 0){
+            std::cout << cur_agent << " as \n";
             if(Body_ClearBall2009().execute(agent)){
                 std::cout << "qw \n";
                 return true;
             }
         }
-        if(cur_agent==8){
+        if(Opponenthasball && cur_agent==10){
             //manmark forward-number:10 during whole match
-            permanentManmark(agent,10);
-        }
-        else if(Opponenthasball && cur_agent==9){
-            //manmark forward number:11 during whole match
             permanentManmark(agent,11);
         }
         else if(Opponenthasball && agent->world().ball().pos().x < 30 && cur_agent<=5){
             //remaining 2 defenders form wall  if ball is in our half
             formWall(agent);
         }
-        else if(Opponenthasball && agent->world().ball().pos().x < 0 && cur_agent==6 || cur_agent==7){
+        else if(Opponenthasball && agent->world().ball().pos().x < 15 && (cur_agent==6 || cur_agent==7)){
             formWall2(agent);
         }
         else{
@@ -762,7 +756,54 @@ SamplePlayer::executeSampleRole( PlayerAgent * agent )
             }
             else{
                 //manmark closest player
+                if(agent->world().ball().pos().x > -20 && Opponenthasball){
+                    closestManmark(agent);
+                    return true;
+                }
+                for(int i=0;i<4;i++){
+                    if(!IsOccupied(agent,wall_pos[i],4)){
+                        Body_GoToPoint(wall_pos[i], 0.5, ServerParam::i().maxDashPower()).execute( agent );
+                        Bhv_BasicTackle( 0.8, 80.0 ).execute( agent );
+
+                        const WorldModel & wm = agent->world();
+                        const int self_min = wm.interceptTable()->selfReachCycle();
+                        const int mate_min = wm.interceptTable()->teammateReachCycle();
+                        const int opp_min = wm.interceptTable()->opponentReachCycle();
+
+                        //Intercept
+                        if ( ! wm.existKickableTeammate()
+                             && ( self_min <= 3
+                                  || ( self_min <= mate_min
+                                       && self_min < opp_min + 3 )
+                                  )
+                             )
+                        {
+                            std::cout<<"body intercept called for player - "<<wm.self().unum()<<std::endl;
+
+
+                            dlog.addText( Logger::TEAM,
+                                          __FILE__": intercept");
+                            Body_Intercept().execute( agent );
+                            agent->setNeckAction( new Neck_OffensiveInterceptNeck() );
+                            return true;
+                        }
+
+                        if ( wm.existKickableOpponent()
+                             && wm.ball().distFromSelf() < 18.0 )
+                        {
+                            agent->setNeckAction( new Neck_TurnToBall() );
+                            return true;
+                        }
+                        else
+                        {
+                            agent->setNeckAction( new Neck_TurnToBallOrScan() );
+                        }
+
+                        return true;
+                    }
+                }
                 closestManmark(agent);
+                //do something about diagonal passes
             }
         }
     }
@@ -861,8 +902,8 @@ SamplePlayer::formWall(PlayerAgent *agent){
         pos = Vector2D(-47,11);
     }*/
     Vector2D ball_pos=agent->world().ball().pos();
+    Vector2D disp;
     if(IsOccupied(agent,pos,2)){
-        Vector2D disp;
         if(ball_pos.y>pos.y){
             disp.y=8;
             disp.x=-2;
@@ -874,6 +915,24 @@ SamplePlayer::formWall(PlayerAgent *agent){
         pos.x=pos.x+disp.x;
         pos.y=pos.y+disp.y;
     }
+    if(ball_pos.x<-30){
+        disp.y=0;disp.x=0;
+        if(ball_pos.y>pos.y){
+            //disp.y=abs(ball_pos.y-pos.y);
+            disp.y=1;
+        }
+        else{
+            //disp.y=-1*abs(ball_pos.y-pos.y);
+            disp.y=-1;
+        }
+        if(pos.x>ball_pos.x){
+            disp.x=-1*abs(ball_pos.x-pos.x);
+            //disp.x=-1;
+        }
+        pos.x=pos.x+disp.x;
+        pos.y=pos.y+disp.y;
+    }
+
     Body_GoToPoint(pos, 0.5, ServerParam::i().maxDashPower()).execute( agent );
     Bhv_BasicTackle( 0.8, 80.0 ).execute( agent );
 
@@ -924,8 +983,8 @@ SamplePlayer::formWall2(PlayerAgent *agent){
     else{
         pos=wall_pos2[1];
     }
+    Vector2D disp;
     if(IsOccupied(agent,pos,2)){
-        Vector2D disp;
         if(ball_pos.y<0){
             disp.y=-6;
             disp.x=-2;
@@ -937,6 +996,25 @@ SamplePlayer::formWall2(PlayerAgent *agent){
         pos.x=pos.x+disp.x;
         pos.y=pos.y+disp.y;
     }
+    disp.y=0;disp.x=0;
+    int unum=agent->world().self().unum();
+    if(ball_pos.y>pos.y){
+        disp.y=abs(ball_pos.y-pos.y);
+        if(unum%2==0){
+            disp.y+=1;
+        }
+    }
+    else{
+        disp.y=-1*abs(ball_pos.y-pos.y);
+        if(unum%2==0){
+            disp.y-=1;
+        }
+    }
+    if(pos.x>ball_pos.x){
+        disp.x=-1*abs(ball_pos.x-pos.x);
+    }
+    pos.x=pos.x+disp.x;
+    pos.y=pos.y+disp.y;
     Body_GoToPoint(pos, 0.5, ServerParam::i().maxDashPower()).execute( agent );
     Bhv_BasicTackle( 0.8, 80.0 ).execute( agent );
 
